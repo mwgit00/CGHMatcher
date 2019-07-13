@@ -27,43 +27,41 @@
 
 namespace ghbase
 {
-    // combines an image point and the number of votes it will contribute
-    // a point may get more than one vote
-    typedef struct _T_pt_votes_struct
+    // This class combines an image point and the number of votes it will contribute.
+    // A point may get more than one vote.
+    class PtVotes
     {
+    public:
+        PtVotes() : pt(0, 0), votes(0) {}
+        PtVotes(const cv::Point& _pt, const uint16_t _v) : pt(_pt), votes(_v) {}
+        virtual ~PtVotes() {}
+    public:
         cv::Point pt;
         uint16_t votes;
-        _T_pt_votes_struct() : pt{}, votes(0) {}
-        _T_pt_votes_struct(const cv::Point& _pt, const uint16_t _v) : pt{ _pt }, votes(_v) {}
-    } T_pt_votes;
+    };
 
 
-    // one value element for the Generalized Hough lookup table
-    // a key will be mapped to a value with an array of point-vote structures
-    typedef struct _T_value_struct
+    // This is one value element for the Generalized Hough lookup table.
+    // A key will be mapped to a value with an array of point-vote structures.
+    class PtVotesArray
     {
-        size_t ct;
-        T_pt_votes * pt_votes;
-        _T_value_struct() : ct(0), pt_votes(nullptr) {}
-        ~_T_value_struct() { clear(); }
+    public:
+        PtVotesArray() : ct(0), pt_votes(nullptr) {}
+        virtual ~PtVotesArray() { clear(); }
         void clear() { ct = 0;  if (pt_votes) { delete[] pt_votes; } pt_votes = nullptr; }
-    } T_value;
+    public:
+        size_t ct;
+        PtVotes * pt_votes;
+    };
 
 
-    // Non-STL data structure for Generalized Hough lookup table
-    // the lookup operation is just an array access with the index as the key
-    typedef struct _T_lookup_table_struct
+    // This is a Non-STL data structure for a Generalized Hough lookup table.
+    // The lookup operation is just an array access.
+    class LookupTable
     {
-        cv::Size img_sz;
-        size_t elem_ct;
-        size_t total_votes;
-        size_t total_entries;
-        T_value * elems;
-
-        _T_lookup_table_struct() :
-            img_sz(0, 0), elem_ct(0), total_votes(0), total_entries(0), elems(nullptr) {}
-
-        ~_T_lookup_table_struct() { clear(); }
+    public:
+        LookupTable() : img_sz(0, 0), elem_ct(0), elems(nullptr) {}
+        virtual ~LookupTable() { clear(); }
 
         void clear()
         {
@@ -73,12 +71,14 @@ namespace ghbase
                 delete[] elems;
             }
             img_sz = { 0, 0 };
-            total_votes = 0;
-            total_entries = 0;
             elems = nullptr;
             elem_ct = 0;
         }
-    } T_lookup_table;
+    public:
+        cv::Size img_sz;
+        size_t elem_ct;
+        PtVotesArray * elems;
+    };
 
 
     // Applies Generalized Hough transform to an encoded "key" image.
@@ -93,7 +93,7 @@ namespace ghbase
     void apply_ghough_transform(
         const cv::Mat& rkeyimg,
         cv::Mat& rvotes,
-        const ghbase::T_lookup_table& rtable)
+        const ghbase::LookupTable& rtable)
     {
         rvotes = cv::Mat::zeros(rkeyimg.size(), E_VOTE_IMG_TYPE);
         for (int i = rtable.img_sz.height / 2; i < rkeyimg.rows - rtable.img_sz.height / 2; i++)
@@ -130,7 +130,7 @@ namespace ghbase
     void apply_ghough_transform_allpix(
         const cv::Mat& rkeyimg,
         cv::Mat& rvotes,
-        const ghbase::T_lookup_table& rtable)
+        const ghbase::LookupTable& rtable)
     {
         rvotes = cv::Mat::zeros(rkeyimg.size(), E_VOTE_IMG_TYPE);
         for (int i = 1; i < (rkeyimg.rows - 1); i++)
@@ -141,7 +141,7 @@ namespace ghbase
                 // look up voting table for pixel
                 // iterate through the points and add votes
                 T_KEY uu = pix[j];
-                T_pt_votes * pt_votes = rtable.elems[uu].pt_votes;
+                PtVotes * pt_votes = rtable.elems[uu].pt_votes;
                 const size_t ct = rtable.elems[uu].ct;
                 for (size_t k = 0; k < ct; k++)
                 {

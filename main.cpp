@@ -102,18 +102,14 @@ static void image_output(
     const Knobs& rknobs)
 {
     const int h_score = 16;
-    const double m_scale = theMatcher.m_scale;
 
     // determine size of "target" box
-    // it will vary depending on the scale parameter
     Size rsz = theMatcher.m_ghtable.img_sz;
-    rsz.height = static_cast<int>(rsz.height * m_scale);
-    rsz.width = static_cast<int>(rsz.width * m_scale);
     Point corner = { rptmax.x - rsz.width / 2, rptmax.y - rsz.height / 2 };
 
     // format score string for viewer (#.##)
     std::ostringstream oss;
-    oss << std::fixed << std::setprecision(2) << (qmax / theMatcher.m_ghtable.total_votes);
+    oss << std::fixed << std::setprecision(2) << (qmax / theMatcher.m_max_votes);
 
     // draw current template in upper right corner
     Mat bgr_template_img;
@@ -155,11 +151,22 @@ static void reload_template(
     std::string spath = DATA_PATH + rinfo.sname;
     template_image = imread(spath, IMREAD_GRAYSCALE);
 
-    theMatcher.init(rknobs.get_pre_blur(), static_cast<int>(rknobs.get_ksize()), rinfo.img_scale, rinfo.mag_thr);
-    theMatcher.init_ghough_table_from_img(template_image);
+    // scale the template image prior to generating table
+    Mat scaled_template_image;
+    resize(template_image, scaled_template_image, Size(), rinfo.img_scale, rinfo.img_scale, (rinfo.img_scale > 1.0) ? INTER_CUBIC : INTER_AREA);
+
+    // generate table with scaled template image
+    theMatcher.init(rknobs.get_pre_blur(), static_cast<int>(rknobs.get_ksize()), rinfo.mag_thr);
+    theMatcher.init_ghough_table_from_img(scaled_template_image);
+
+    // after generating table, run transform on the scaled template image to get ideal max votes
+    Mat img_cgrad;
+    Mat img_match;
+    theMatcher.apply_ghough(scaled_template_image, img_cgrad, img_match);
+    minMaxLoc(img_match, nullptr, &theMatcher.m_max_votes, nullptr, nullptr);
 
     std::cout << "Loaded template ((blur,sobel) = " << theMatcher.m_kblur << "," << theMatcher.m_ksobel << "): ";
-    std::cout << rinfo.sname << " " << theMatcher.m_ghtable.total_votes << std::endl;
+    std::cout << rinfo.sname << " " << theMatcher.m_max_votes << std::endl;
 }
 
 
@@ -287,51 +294,48 @@ static void loop(void)
             GaussianBlur(img_gray, img_gray, { m_kblur, m_kblur }, 0);
         }
 
-        // create image of encoded Sobel gradient orientations from blurred input image
         // then apply Generalized Hough transform and locate maximum (best match)
-        theMatcher.create_masked_gradient_orientation_img(img_gray, img_grad);
-        ghbase::apply_ghough_transform_allpix<uint8_t, CV_16U, uint16_t>(img_grad, img_match, theMatcher.m_ghtable);
-
+        theMatcher.apply_ghough(img_gray, img_grad, img_match);
         minMaxLoc(img_match, nullptr, &qmax, nullptr, &ptmax);
 
         // apply the current output mode
         // content varies but all final output images are BGR
         switch (theKnobs.get_output_mode())
         {
-        case Knobs::OUT_RAW:
-        {
-            // show the raw match result
-            Mat temp_8U;
-            normalize(img_match, img_match, 0, 255, cv::NORM_MINMAX);
-            img_match.convertTo(temp_8U, CV_8U);
-            cvtColor(temp_8U, img_viewer, COLOR_GRAY2BGR);
-            break;
-        }
-        case Knobs::OUT_GRAD:
-        {
-            // display encoded gradient image
-            // show red overlay of any matches that exceed arbitrary threshold
-            Mat match_mask;
-            std::vector<std::vector<cv::Point>> contours;
-            normalize(img_grad, img_grad, 0, 255, cv::NORM_MINMAX);
-            cvtColor(img_grad, img_viewer, COLOR_GRAY2BGR);
-            normalize(img_match, img_match, 0, 1, cv::NORM_MINMAX);
-            match_mask = (img_match > MATCH_DISPLAY_THRESHOLD);
-            findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-            drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX);
-            break;
-        }
-        case Knobs::OUT_PREP:
-        {
-            cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
-            break;
-        }
-        case Knobs::OUT_COLOR:
-        default:
-        {
-            // no extra output processing
-            break;
-        }
+            case Knobs::OUT_RAW:
+            {
+                // show the raw match result
+                Mat temp_8U;
+                normalize(img_match, img_match, 0, 255, cv::NORM_MINMAX);
+                img_match.convertTo(temp_8U, CV_8U);
+                cvtColor(temp_8U, img_viewer, COLOR_GRAY2BGR);
+                break;
+            }
+            case Knobs::OUT_GRAD:
+            {
+                // display encoded gradient image
+                // show red overlay of any matches that exceed arbitrary threshold
+                Mat match_mask;
+                std::vector<std::vector<cv::Point>> contours;
+                normalize(img_grad, img_grad, 0, 255, cv::NORM_MINMAX);
+                cvtColor(img_grad, img_viewer, COLOR_GRAY2BGR);
+                normalize(img_match, img_match, 0, 1, cv::NORM_MINMAX);
+                match_mask = (img_match > MATCH_DISPLAY_THRESHOLD);
+                findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+                drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX);
+                break;
+            }
+            case Knobs::OUT_PREP:
+            {
+                cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
+                break;
+            }
+            case Knobs::OUT_COLOR:
+            default:
+            {
+                // no extra output processing
+                break;
+            }
         }
 
         // always show best match contour and target dot on BGR image

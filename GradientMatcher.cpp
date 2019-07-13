@@ -52,36 +52,28 @@ namespace ghalgo
     void GradientMatcher::init(
         const int kblur,
         const int ksobel,
-        const double scale,
         const double magthr,
         const double angstep)
     {
         m_kblur = kblur;
         m_ksobel = ksobel;
-        m_scale = scale;
         m_magthr = magthr;
         m_angstep = angstep;
+        
+        m_max_votes = 0.0;
         m_ghtable.clear();
     }
 
 
-    void GradientMatcher::create_ghough_table(
-        const cv::Mat& rgrad,
-        const double scale)
+    void GradientMatcher::create_ghough_table(const cv::Mat& rgrad)
     {
-        // sanity check scale value
-        double fac = scale;
-        if (fac < 0.1) fac = 0.1;
-        if (fac > 10.0) fac = 10.0;
-
         // calculate centering offset
         int row_offset = rgrad.rows / 2;
         int col_offset = rgrad.cols / 2;
 
         // iterate through the gradient image pixel-by-pixel
         // use STL structures to build a lookup table dynamically
-        uint8_t max_code = 0;
-        std::map<uint8_t, std::map<cv::Point, uint16_t, cmpCvPoint>> lookup_table;
+        std::map<uint8_t, std::map<cv::Point, uint16_t, cmpCvPoint>> temp_lookup_table;
         for (int i = 0; i < rgrad.rows; i++)
         {
             const uint8_t * pix = rgrad.ptr<uint8_t>(i);
@@ -92,23 +84,22 @@ namespace ghalgo
                 const uint8_t uu = pix[j];
                 if (uu)
                 {
-                    // the scaling operation can make one point have multiple votes
                     // so the vote count is mapped to a point and incremented
                     cv::Point offset_pt = cv::Point(col_offset - j, row_offset - i);
-                    offset_pt.x = static_cast<int>(fac * offset_pt.x);
-                    offset_pt.y = static_cast<int>(fac * offset_pt.y);
-                    lookup_table[uu][offset_pt]++;
-                    max_code = (uu > max_code) ? uu : max_code;
+                    temp_lookup_table[uu][offset_pt]++;
                 }
             }
         }
 
         // add blank entry for any code not in map for codes 0-max
-        for (uint8_t key = 0; key <= max_code; key++)
+        // the max is angstep+1 because of how the angle conversion math works
+        size_t max_key = static_cast<size_t>(m_angstep + 1.0);
+        for (size_t key = 0; key <= max_key; key++)
         {
-            if (lookup_table.count(key) == 0)
+            uint8_t ikey = static_cast<uint8_t>(key);
+            if (temp_lookup_table.count(ikey) == 0)
             {
-                lookup_table[key] = {};
+                temp_lookup_table[ikey] = {};
             }
         }
         
@@ -118,23 +109,21 @@ namespace ghalgo
         // then put lookup table into a fixed non-STL structure
         // that is much more efficient when running debug code
         m_ghtable.img_sz = rgrad.size();
-        m_ghtable.elem_ct = lookup_table.size();
-        m_ghtable.elems = new ghbase::T_value[m_ghtable.elem_ct];
-        for (const auto& r : lookup_table)
+        m_ghtable.elem_ct = temp_lookup_table.size();
+        m_ghtable.elems = new ghbase::PtVotesArray[m_ghtable.elem_ct];
+        for (const auto& r : temp_lookup_table)
         {
             uint8_t key = r.first;
             size_t n = r.second.size();
             if (n > 0)
             {
                 m_ghtable.elems[key].ct = n;
-                m_ghtable.elems[key].pt_votes = new ghbase::T_pt_votes[n];
+                m_ghtable.elems[key].pt_votes = new ghbase::PtVotes[n];
                 size_t k = 0;
                 for (const auto& rr : r.second)
                 {
                     cv::Point pt = rr.first;
                     m_ghtable.elems[key].pt_votes[k++] = { pt, rr.second };
-                    m_ghtable.total_votes += rr.second;
-                    m_ghtable.total_entries++;
                 }
             }
         }
@@ -179,10 +168,19 @@ namespace ghalgo
 
     void GradientMatcher::init_ghough_table_from_img(cv::Mat& rimg)
     {
-        // create masked gradient image
+        // create image of encoded Sobel gradient orientations from input image
         // then create Generalized Hough lookup table from that image
         cv::Mat img_cgrad;
         create_masked_gradient_orientation_img(rimg, img_cgrad);
-        create_ghough_table(img_cgrad, m_scale);
+        create_ghough_table(img_cgrad);
+    }
+
+
+    void GradientMatcher::apply_ghough(cv::Mat& rin, cv::Mat& rgrad, cv::Mat& rmatch)
+    {
+        // create image of encoded Sobel gradient orientations from input image
+        // then apply Generalized Hough transform
+        create_masked_gradient_orientation_img(rin, rgrad);
+        ghbase::apply_ghough_transform_allpix<uint8_t, CV_16U, uint16_t>(rgrad, rmatch, m_ghtable);
     }
 }
