@@ -61,6 +61,11 @@ namespace ghalgo
         // Encodes gradients of input image and applies Generalized Hough transform
         void apply_ghough(cv::Mat& rin, cv::Mat& rgrad, cv::Mat& rmatch);
 
+        void load_template(
+            cv::Mat& template_image,
+            const std::string& rsfile,
+            const double prescale = 1.0);
+
     public:
 
         int m_kblur;
@@ -68,7 +73,7 @@ namespace ghalgo
         double m_magthr;
         double m_angstep;
         double m_max_votes;
-        ghbase::LookupTable m_ghtable;
+        ghalgo::LookupTable m_ghtable;
     };
 }
 

@@ -25,7 +25,7 @@
 
 #include "opencv2/imgproc.hpp"
 
-namespace ghbase
+namespace ghalgo
 {
     // This class combines an image point and the number of votes it will contribute.
     // A point may get more than one vote.
@@ -93,7 +93,7 @@ namespace ghbase
     void apply_ghough_transform(
         const cv::Mat& rkeyimg,
         cv::Mat& rvotes,
-        const ghbase::LookupTable& rtable)
+        const ghalgo::LookupTable& rtable)
     {
         rvotes = cv::Mat::zeros(rkeyimg.size(), E_VOTE_IMG_TYPE);
         for (int i = rtable.img_sz.height / 2; i < rkeyimg.rows - rtable.img_sz.height / 2; i++)
@@ -130,7 +130,7 @@ namespace ghbase
     void apply_ghough_transform_allpix(
         const cv::Mat& rkeyimg,
         cv::Mat& rvotes,
-        const ghbase::LookupTable& rtable)
+        const ghalgo::LookupTable& rtable)
     {
         rvotes = cv::Mat::zeros(rkeyimg.size(), E_VOTE_IMG_TYPE);
         for (int i = 1; i < (rkeyimg.rows - 1); i++)

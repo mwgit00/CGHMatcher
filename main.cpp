@@ -102,6 +102,7 @@ static void image_output(
     const Knobs& rknobs)
 {
     const int h_score = 16;
+    const int w_score = 40;
 
     // determine size of "target" box
     Size rsz = theMatcher.m_ghtable.img_sz;
@@ -124,8 +125,11 @@ static void image_output(
     rectangle(rimg, { osz.width - tsz.width, 0 }, { osz.width, tsz.height }, box_color, 2);
 
     // draw black background box then draw text score on top of it
-    rectangle(rimg, { corner.x,corner.y - h_score, 40, h_score }, SCA_BLACK, -1);
-    putText(rimg, oss.str(), { corner.x,corner.y - 4 }, FONT_HERSHEY_PLAIN, 1.0, SCA_WHITE, 1);
+    // dispaly location is adjusted based on visible corners (default is upper left)
+    int score_y = (corner.y > h_score) ? (corner.y - h_score) : (corner.y + rsz.height);
+    int score_x = (corner.x > 0) ? corner.x : corner.x + rsz.width - w_score;
+    rectangle(rimg, { score_x, score_y, 40, h_score }, SCA_BLACK, -1);
+    putText(rimg, oss.str(), { score_x, score_y + h_score - 4 }, FONT_HERSHEY_PLAIN, 1.0, SCA_WHITE, 1);
 
     // draw rectangle around best match with yellow dot at center
     rectangle(rimg, { corner.x, corner.y, rsz.width, rsz.height }, SCA_GREEN, 2);
@@ -148,25 +152,14 @@ static void reload_template(
     const Knobs& rknobs,
     const T_file_info& rinfo)
 {
+    // with more "knobs" the magnitude threshold and angle step setting could also be re-applied here
+    // but right now only the pre-blur Gaussian kernel size and Sobel kernel size can be adjusted on the fly
     std::string spath = DATA_PATH + rinfo.sname;
-    template_image = imread(spath, IMREAD_GRAYSCALE);
-
-    // scale the template image prior to generating table
-    Mat scaled_template_image;
-    resize(template_image, scaled_template_image, Size(), rinfo.img_scale, rinfo.img_scale, (rinfo.img_scale > 1.0) ? INTER_CUBIC : INTER_AREA);
-
-    // generate table with scaled template image
     theMatcher.init(rknobs.get_pre_blur(), static_cast<int>(rknobs.get_ksize()), rinfo.mag_thr);
-    theMatcher.init_ghough_table_from_img(scaled_template_image);
-
-    // after generating table, run transform on the scaled template image to get ideal max votes
-    Mat img_cgrad;
-    Mat img_match;
-    theMatcher.apply_ghough(scaled_template_image, img_cgrad, img_match);
-    minMaxLoc(img_match, nullptr, &theMatcher.m_max_votes, nullptr, nullptr);
-
-    std::cout << "Loaded template ((blur,sobel) = " << theMatcher.m_kblur << "," << theMatcher.m_ksobel << "): ";
-    std::cout << rinfo.sname << " " << theMatcher.m_max_votes << std::endl;
+    theMatcher.load_template(template_image, spath, rinfo.img_scale);
+    std::cout << "LOADED:  blur=" << theMatcher.m_kblur << ", sobel=" << theMatcher.m_ksobel;
+    std::cout << ", magthr=" << theMatcher.m_magthr << ", " << rinfo.sname << " ";
+    std::cout << theMatcher.m_max_votes << std::endl;
 }
 
 

@@ -22,7 +22,6 @@
 
 #include <map>
 #include <list>
-#include <set>
 #include "opencv2/highgui.hpp"
 #include "GradientMatcher.h"
 
@@ -110,7 +109,7 @@ namespace ghalgo
         // that is much more efficient when running debug code
         m_ghtable.img_sz = rgrad.size();
         m_ghtable.elem_ct = temp_lookup_table.size();
-        m_ghtable.elems = new ghbase::PtVotesArray[m_ghtable.elem_ct];
+        m_ghtable.elems = new PtVotesArray[m_ghtable.elem_ct];
         for (const auto& r : temp_lookup_table)
         {
             uint8_t key = r.first;
@@ -118,7 +117,7 @@ namespace ghalgo
             if (n > 0)
             {
                 m_ghtable.elems[key].ct = n;
-                m_ghtable.elems[key].pt_votes = new ghbase::PtVotes[n];
+                m_ghtable.elems[key].pt_votes = new PtVotes[n];
                 size_t k = 0;
                 for (const auto& rr : r.second)
                 {
@@ -181,6 +180,31 @@ namespace ghalgo
         // create image of encoded Sobel gradient orientations from input image
         // then apply Generalized Hough transform
         create_masked_gradient_orientation_img(rin, rgrad);
-        ghbase::apply_ghough_transform_allpix<uint8_t, CV_16U, uint16_t>(rgrad, rmatch, m_ghtable);
+        apply_ghough_transform_allpix<uint8_t, CV_16U, uint16_t>(rgrad, rmatch, m_ghtable);
+    }
+
+
+    void GradientMatcher::load_template(
+        cv::Mat& template_image,
+        const std::string& rsfile,
+        const double prescale)
+    {
+        template_image = cv::imread(rsfile, cv::IMREAD_GRAYSCALE);
+
+        // scale the template image prior to generating table
+        // use recommended interpolation method when shrinking or enlarging
+        cv::Mat scaled_template_image;
+        resize(template_image, scaled_template_image, cv::Size(), prescale, prescale, (prescale > 1.0) ? cv::INTER_CUBIC : cv::INTER_AREA);
+
+        // apply the pre-blur setting since processing loop also does a pre-blur
+        GaussianBlur(scaled_template_image, scaled_template_image, { m_kblur, m_kblur }, 0);
+
+        init_ghough_table_from_img(scaled_template_image);
+
+        // after generating table, run transform on the scaled template image to get ideal max votes
+        cv::Mat img_cgrad;
+        cv::Mat img_match;
+        apply_ghough(scaled_template_image, img_cgrad, img_match);
+        minMaxLoc(img_match, nullptr, &m_max_votes, nullptr, nullptr);
     }
 }

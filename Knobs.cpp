@@ -62,7 +62,7 @@ void Knobs::show_help(void) const
     std::cout << "e         Toggle histogram equalization" << std::endl;
     std::cout << "r         Toggle recording mode" << std::endl;
     std::cout << "t         Select next template from collection" << std::endl;
-    std::cout << "u         Update Hough parameters from current settings" << std::endl;
+    std::cout << "u         Update Hough lookup table from current settings" << std::endl;
     std::cout << "v         Create video from files in movie folder" << std::endl;
     std::cout << "?         Display this help info" << std::endl;
     std::cout << std::endl;
