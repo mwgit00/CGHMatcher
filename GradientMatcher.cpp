@@ -20,23 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <map>
-#include <list>
 #include "opencv2/highgui.hpp"
 #include "GradientMatcher.h"
 
 
 namespace ghalgo
 {
-    // custom comparison operator for cv::Point
-    // it can can be used to sort points by X then by Y
-    struct cmpCvPoint {
-        bool operator()(const cv::Point& a, const cv::Point& b) const {
-            return (a.x < b.x) || ((a.x == b.x) && (a.y < b.y));
-        }
-    };
-
-
     GradientMatcher::GradientMatcher()
     {
         init();
@@ -66,66 +55,9 @@ namespace ghalgo
 
     void GradientMatcher::create_ghough_table(const cv::Mat& rgrad)
     {
-        // calculate centering offset
-        int row_offset = rgrad.rows / 2;
-        int col_offset = rgrad.cols / 2;
-
-        // iterate through the gradient image pixel-by-pixel
-        // use STL structures to build a lookup table dynamically
-        std::map<uint8_t, std::map<cv::Point, uint16_t, cmpCvPoint>> temp_lookup_table;
-        for (int i = 0; i < rgrad.rows; i++)
-        {
-            const uint8_t * pix = rgrad.ptr<uint8_t>(i);
-            for (int j = 0; j < rgrad.cols; j++)
-            {
-                // get the gradient pixel value (key)
-                // everything non-zero is valid
-                const uint8_t uu = pix[j];
-                if (uu)
-                {
-                    // so the vote count is mapped to a point and incremented
-                    cv::Point offset_pt = cv::Point(col_offset - j, row_offset - i);
-                    temp_lookup_table[uu][offset_pt]++;
-                }
-            }
-        }
-
-        // add blank entry for any code not in map for codes 0-max
-        // the max is angstep+1 because of how the angle conversion math works
-        size_t max_key = static_cast<size_t>(m_angstep + 1.0);
-        for (size_t key = 0; key <= max_key; key++)
-        {
-            uint8_t ikey = static_cast<uint8_t>(key);
-            if (temp_lookup_table.count(ikey) == 0)
-            {
-                temp_lookup_table[ikey] = {};
-            }
-        }
-        
-        // blow away any old data in table
-        m_ghtable.clear();
-
-        // then put lookup table into a fixed non-STL structure
-        // that is much more efficient when running debug code
-        m_ghtable.img_sz = rgrad.size();
-        m_ghtable.elem_ct = temp_lookup_table.size();
-        m_ghtable.elems = new PtVotesArray[m_ghtable.elem_ct];
-        for (const auto& r : temp_lookup_table)
-        {
-            uint8_t key = r.first;
-            size_t n = r.second.size();
-            if (n > 0)
-            {
-                m_ghtable.elems[key].ct = n;
-                m_ghtable.elems[key].pt_votes = new PtVotes[n];
-                size_t k = 0;
-                for (const auto& rr : r.second)
-                {
-                    cv::Point pt = rr.first;
-                    m_ghtable.elems[key].pt_votes[k++] = { pt, rr.second };
-                }
-            }
-        }
+        // key is 8-bit
+        // max key is angle steps + 1 because both 0 and 2pi can come from polar conversion
+        ghalgo::create_lookup_table(rgrad, static_cast<uint8_t>(m_angstep + 1.0), m_ghtable);
     }
 
     

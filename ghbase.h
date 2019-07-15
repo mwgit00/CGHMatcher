@@ -23,10 +23,21 @@
 #ifndef GHBASE_H_
 #define GHBASE_H_
 
+#include <map>
+#include <vector>
 #include "opencv2/imgproc.hpp"
 
 namespace ghalgo
 {
+    // custom comparison operator for cv::Point
+    // it can can be used to sort points by X then by Y
+    struct cmpCvPoint {
+        bool operator()(const cv::Point& a, const cv::Point& b) const {
+            return (a.x < b.x) || ((a.x == b.x) && (a.y < b.y));
+        }
+    };
+
+
     // This class combines an image point and the number of votes it will contribute.
     // A point may get more than one vote.
     class PtVotes
@@ -79,6 +90,69 @@ namespace ghalgo
         size_t elem_ct;
         PtVotesArray * elems;
     };
+
+
+    // maps a point to its vote count
+    // a custom comparison operator does the point comparison
+    typedef std::map<cv::Point, uint16_t, cmpCvPoint> tMapPtToVotes;
+
+    
+    template<typename T_KEY>
+    void create_lookup_table(const cv::Mat& rkey, const T_KEY max_key, ghalgo::LookupTable& rtable)
+    {
+        // calculate centering offset
+        int row_offset = rkey.rows / 2;
+        int col_offset = rkey.cols / 2;
+
+        // iterate through the key image pixel-by-pixel
+        // use STL structures to build a lookup table dynamically
+        // the size of the table is max_key + 1 since it contains keys 0 to max_key
+        std::vector<tMapPtToVotes> temp_lookup_table(max_key + 1);
+        for (int i = 0; i < rkey.rows; i++)
+        {
+            const T_KEY * pix = rkey.ptr<T_KEY>(i);
+            for (int j = 0; j < rkey.cols; j++)
+            {
+                // process everything with non-zero key
+                const T_KEY ghkey = pix[j];
+                if (ghkey)
+                {
+                    // the vote count is mapped to a point and incremented
+                    cv::Point offset_pt = cv::Point(col_offset - j, row_offset - i);
+                    temp_lookup_table[ghkey][offset_pt]++;
+                }
+            }
+        }
+
+        // blow away any old data in table
+        rtable.clear();
+
+        // then put lookup table into a fixed non-STL structure
+        // that is much more efficient when running debug code
+        rtable.img_sz = rkey.size();
+        rtable.elem_ct = temp_lookup_table.size();
+        rtable.elems = new PtVotesArray[rtable.elem_ct];
+        for (size_t key = 0; key <= static_cast<size_t>(max_key); key++)
+        {
+            const T_KEY tkey = static_cast<T_KEY>(key);
+            if (temp_lookup_table[key].size())
+            {
+                tMapPtToVotes& rmap = temp_lookup_table[tkey];
+                const size_t n = rmap.size();
+                if (n > 0)
+                {
+                    rtable.elems[key].ct = n;
+                    rtable.elems[key].pt_votes = new PtVotes[n];
+                    size_t k = 0;
+                    for (const auto& rvotes : rmap)
+                    {
+                        cv::Point pt = rvotes.first;
+                        rtable.elems[key].pt_votes[k++] = { pt, rvotes.second };
+                    }
+                }
+            }
+        }
+    }
 
 
     // Applies Generalized Hough transform to an encoded "key" image.
