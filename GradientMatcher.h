@@ -41,11 +41,8 @@ namespace ghalgo
         void init(
             const int kblur = 7,
             const int ksobel = 7,
-            const double magthr = 1.0,
+            const double magthr = 0.2,
             const double angstep = 8.0);
-
-        // Creates a Generalized Hough lookup table from encoded gradient input image (CV_8U).
-        void create_ghough_table(const cv::Mat& rgrad);
 
         // This is the preprocessing step for the "classic" Generalized Hough algorithm.
         // Calculates Sobel derivatives of input grayscale image.  Converts to polar coordinates and
@@ -53,14 +50,15 @@ namespace ghalgo
         // Masks the pixels with gradient magnitudes above a threshold.
         void create_masked_gradient_orientation_img(const cv::Mat& rimg, cv::Mat& rmgo);
 
-        // Helper function for initializing Generalized Hough table from grayscale image.
+        // Initializes Generalized Hough table from grayscale image.
         // Default parameters are good starting point for doing object identification.
-        // Table must be a newly created object with blank data.
-        void init_ghough_table_from_img(cv::Mat& rimg);
+        void init_ghough_table_from_img(const cv::Mat& rimg);
 
         // Encodes gradients of input image and applies Generalized Hough transform
-        void apply_ghough(cv::Mat& rin, cv::Mat& rgrad, cv::Mat& rmatch);
+        void apply_ghough(const cv::Mat& rin, cv::Mat& rgrad, cv::Mat& rmatch);
 
+        // Loads an image from a file, scales it, blurs it, and creates Generalized Hough table from it.
+        // A reference to a blank image is passed in.  The loaded image is passed back.
         void load_template(
             cv::Mat& template_image,
             const std::string& rsfile,

@@ -53,14 +53,6 @@ namespace ghalgo
     }
 
 
-    void GradientMatcher::create_ghough_table(const cv::Mat& rgrad)
-    {
-        // key is 8-bit
-        // max key is angle steps + 1 because both 0 and 2pi can come from polar conversion
-        ghalgo::create_lookup_table(rgrad, static_cast<uint8_t>(m_angstep + 1.0), m_ghtable);
-    }
-
-    
     void GradientMatcher::create_masked_gradient_orientation_img(
         const cv::Mat& rimg,
         cv::Mat& rmgo)
@@ -97,17 +89,29 @@ namespace ghalgo
     }
 
 
-    void GradientMatcher::init_ghough_table_from_img(cv::Mat& rimg)
+    void GradientMatcher::init_ghough_table_from_img(const cv::Mat& rimg)
     {
+        cv::Mat img_blur;
+        cv::Mat img_cgrad;
+        cv::Mat img_match;
+
+        // apply the pre-blur setting since processing loop also does a pre-blur
+        GaussianBlur(rimg, img_blur, { m_kblur, m_kblur }, 0);
+        
         // create image of encoded Sobel gradient orientations from input image
         // then create Generalized Hough lookup table from that image
-        cv::Mat img_cgrad;
-        create_masked_gradient_orientation_img(rimg, img_cgrad);
-        create_ghough_table(img_cgrad);
+        create_masked_gradient_orientation_img(img_blur, img_cgrad);
+
+        // key is 8-bit
+        // max key is angle steps + 1 because both 0 and 2pi can come from polar conversion
+        ghalgo::create_lookup_table(img_cgrad, static_cast<uint8_t>(m_angstep + 1.0), m_ghtable);
+
+        // stash floating point value of ideal max votes
+        m_max_votes = static_cast<double>(m_ghtable.max_votes);
     }
 
 
-    void GradientMatcher::apply_ghough(cv::Mat& rin, cv::Mat& rgrad, cv::Mat& rmatch)
+    void GradientMatcher::apply_ghough(const cv::Mat& rin, cv::Mat& rgrad, cv::Mat& rmatch)
     {
         // create image of encoded Sobel gradient orientations from input image
         // then apply Generalized Hough transform
@@ -128,15 +132,6 @@ namespace ghalgo
         cv::Mat scaled_template_image;
         resize(template_image, scaled_template_image, cv::Size(), prescale, prescale, (prescale > 1.0) ? cv::INTER_CUBIC : cv::INTER_AREA);
 
-        // apply the pre-blur setting since processing loop also does a pre-blur
-        GaussianBlur(scaled_template_image, scaled_template_image, { m_kblur, m_kblur }, 0);
-
         init_ghough_table_from_img(scaled_template_image);
-
-        // after generating table, run transform on the scaled template image to get ideal max votes
-        cv::Mat img_cgrad;
-        cv::Mat img_match;
-        apply_ghough(scaled_template_image, img_cgrad, img_match);
-        minMaxLoc(img_match, nullptr, &m_max_votes, nullptr, nullptr);
     }
 }
