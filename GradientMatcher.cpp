@@ -43,12 +43,12 @@ namespace ghalgo
         const double magthr,
         const double angstep)
     {
-        m_kblur = kblur;
+        m_kpreblur = kblur;
         m_ksobel = ksobel;
         m_magthr = magthr;
         m_angstep = angstep;
-        
         m_max_votes = 0.0;
+        m_loopstep = 1;
         m_ghtable.clear();
     }
 
@@ -96,7 +96,7 @@ namespace ghalgo
         cv::Mat img_match;
 
         // apply the pre-blur setting since processing loop also does a pre-blur
-        GaussianBlur(rimg, img_blur, { m_kblur, m_kblur }, 0);
+        GaussianBlur(rimg, img_blur, { m_kpreblur, m_kpreblur }, 0);
         
         // create image of encoded Sobel gradient orientations from input image
         // then create Generalized Hough lookup table from that image
@@ -116,7 +116,7 @@ namespace ghalgo
         // create image of encoded Sobel gradient orientations from input image
         // then apply Generalized Hough transform
         create_masked_gradient_orientation_img(rin, rgrad);
-        apply_ghough_transform_allpix<uint8_t, CV_16U, uint16_t>(rgrad, rmatch, m_ghtable);
+        apply_ghough_transform_allpix<uint8_t, CV_16U, uint16_t>(rgrad, rmatch, m_ghtable, m_loopstep);
     }
 
 

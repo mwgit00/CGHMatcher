@@ -82,9 +82,13 @@ public:
     void inc_img_scale(void) { nimgscale = (nimgscale < (vimgscale.size() - 1)) ? nimgscale + 1 : nimgscale; }
     void dec_img_scale(void) { nimgscale = (nimgscale > 0) ? nimgscale - 1 : nimgscale; };
 
-    double get_ksize(void) const { return vksize[nksize]; }
-    void inc_ksize(void) { nksize = (nksize < (vksize.size() - 1)) ? nksize + 1 : nksize; }
-    void dec_ksize(void) { nksize = (nksize > 0) ? nksize - 1 : nksize; };
+    int get_ksobel(void) const { return vksobel[nksobel]; }
+    void inc_ksobel(void) { nksobel = (nksobel < (vksobel.size() - 1)) ? nksobel + 1 : nksobel; }
+    void dec_ksobel(void) { nksobel = (nksobel > 0) ? nksobel - 1 : nksobel; };
+
+    int get_loopstep(void) const { return nloopstep; }
+    void inc_loopstep(void) { nloopstep = (nloopstep < 4) ? nloopstep + 1 : nloopstep; }
+    void dec_loopstep(void) { nloopstep = (nloopstep > 1) ? nloopstep - 1 : nloopstep; };
 
     void handle_keypress(const char c);
 
@@ -115,17 +119,20 @@ private:
     // Type of operation that is required
     int op_id;
 
+    // Step for running one pass of algorithm
+    int nloopstep;
+
     // Index of currently selected scale factor
     size_t nimgscale;
 
     // Index of currently selected Sobel kernel size
-    size_t nksize;
+    size_t nksobel;
 
     // Array of supported scale factors
     std::vector<double> vimgscale;
 
     // Array of supported Sobel kernel sizes
-    std::vector<int> vksize;
+    std::vector<int> vksobel;
 };
 
 #endif // KNOBS_H_

@@ -58,6 +58,7 @@ namespace ghalgo
         void apply_ghough(const cv::Mat& rin, cv::Mat& rgrad, cv::Mat& rmatch);
 
         // Loads an image from a file, scales it, blurs it, and creates Generalized Hough table from it.
+        // It uses the settings that were applied by the "init" method.
         // A reference to a blank image is passed in.  The loaded image is passed back.
         void load_template(
             cv::Mat& template_image,
@@ -66,11 +67,14 @@ namespace ghalgo
 
     public:
 
-        int m_kblur;
+        int m_kpreblur;
         int m_ksobel;
+
         double m_magthr;
         double m_angstep;
         double m_max_votes;
+
+        int m_loopstep;
         ghalgo::LookupTable m_ghtable;
     };
 }

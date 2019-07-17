@@ -34,10 +34,11 @@ Knobs::Knobs() :
     nchannel(Knobs::ALL_CHANNELS),
     noutmode(Knobs::OUT_COLOR),
     op_id(Knobs::OP_NONE),
+    nloopstep(1),
     nimgscale(3),
-    nksize(4),
+    nksobel(4),
     vimgscale({ 0.25, 0.325, 0.4, 0.5, 0.625, 0.75, 1.0 }),
-    vksize({ -1, 1, 3, 5, 7})
+    vksobel({ -1, 1, 3, 5, 7})
 {
 }
 
@@ -59,6 +60,7 @@ void Knobs::show_help(void) const
     std::cout << "_ or +    Adjust CLAHE clip limit (decrease, increase)" << std::endl;
     std::cout << "[ or ]    Adjust image scale (decrease, increase)" << std::endl;
     std::cout << "{ or }    Adjust Sobel kernel size (decrease, increase)" << std::endl;
+    std::cout << "< or >    Adjust alorithm loop step (decrease, increase)" << std::endl;
     std::cout << "e         Toggle histogram equalization" << std::endl;
     std::cout << "r         Toggle recording mode" << std::endl;
     std::cout << "t         Select next template from collection" << std::endl;
@@ -106,16 +108,26 @@ void Knobs::handle_keypress(const char ckey)
         }
         case '}':
         {
-            inc_ksize();
+            inc_ksobel();
             is_op_required = true;
             op_id = Knobs::OP_UPDATE;
             break;
         }
         case '{':
         {
-            dec_ksize();
+            dec_ksobel();
             is_op_required = true;
             op_id = Knobs::OP_UPDATE;
+            break;
+        }
+        case '>':
+        {
+            inc_loopstep();
+            break;
+        }
+        case '<':
+        {
+            dec_loopstep();
             break;
         }
         case 'e':
@@ -173,6 +185,7 @@ void Knobs::handle_keypress(const char ckey)
         std::cout << "  Blur=" << kpreblur;
         std::cout << "  Out=" << sout[noutmode];
         std::cout << "  Scale=" << vimgscale[nimgscale];
+        std::cout << "  Step=" << nloopstep;
         std::cout << std::endl;
     }
 }

@@ -108,9 +108,13 @@ static void image_output(
     Size rsz = theMatcher.m_ghtable.img_sz;
     Point corner = { rptmax.x - rsz.width / 2, rptmax.y - rsz.height / 2 };
 
+    // a loop step of 2 means 1/4 of the pixels will be processed, 3 means 1/9 will be processed, etc.
+    // so the score must be adjusted by the squared loop step to keep it consistent for different step values
+    double step_scale = static_cast<double>(theMatcher.m_loopstep * theMatcher.m_loopstep);
+
     // format score string for viewer (#.##)
     std::ostringstream oss;
-    oss << std::fixed << std::setprecision(2) << (qmax / theMatcher.m_max_votes);
+    oss << std::fixed << std::setprecision(2) << ((qmax / theMatcher.m_max_votes) * step_scale);
 
     // draw current template in upper right corner
     Mat bgr_template_img;
@@ -132,7 +136,7 @@ static void image_output(
     putText(rimg, oss.str(), { score_x, score_y + h_score - 4 }, FONT_HERSHEY_PLAIN, 1.0, SCA_WHITE, 1);
 
     // draw rectangle around best match with yellow dot at center
-    rectangle(rimg, { corner.x, corner.y, rsz.width, rsz.height }, SCA_GREEN, 2);
+    rectangle(rimg, Rect(corner.x, corner.y, rsz.width, rsz.height), SCA_GREEN, 2);
     circle(rimg, rptmax, 2, SCA_YELLOW, -1);
 
     // save each frame to a file if recording
@@ -155,10 +159,10 @@ static void reload_template(
     // with more "knobs" the magnitude threshold and angle step setting could also be re-applied here
     // but right now only the pre-blur Gaussian kernel size and Sobel kernel size can be adjusted on the fly
     std::string spath = DATA_PATH + rinfo.sname;
-    theMatcher.init(rknobs.get_pre_blur(), static_cast<int>(rknobs.get_ksize()), rinfo.mag_thr);
+    theMatcher.init(rknobs.get_pre_blur(), rknobs.get_ksobel(), rinfo.mag_thr);
     theMatcher.load_template(template_image, spath, rinfo.img_scale);
-    std::cout << "LOADED:  blur=" << theMatcher.m_kblur << ", sobel=" << theMatcher.m_ksobel;
-    std::cout << ", magthr=" << theMatcher.m_magthr << ", " << rinfo.sname << " ";
+    std::cout << "LOADED:  blur=" << rknobs.get_pre_blur() << ", sobel=" << rknobs.get_ksobel();
+    std::cout << ", magthr=" << rinfo.mag_thr << ", " << rinfo.sname << " ";
     std::cout << theMatcher.m_max_votes << std::endl;
 }
 
@@ -207,8 +211,8 @@ static void loop(void)
 
     while (is_running)
     {
-        int m_kblur = theKnobs.get_pre_blur();
-        int m_ksobel = static_cast<int>(theKnobs.get_ksize());
+        int m_kpreblur = theKnobs.get_pre_blur();
+        int m_ksobel = static_cast<int>(theKnobs.get_ksobel());
 
         // check for any operations that
         // might halt or reset the image processing loop
@@ -282,10 +286,14 @@ static void loop(void)
         }
 
         // apply the current blur setting
-        if (m_kblur > 1)
+        if (m_kpreblur > 1)
         {
-            GaussianBlur(img_gray, img_gray, { m_kblur, m_kblur }, 0);
+            GaussianBlur(img_gray, img_gray, { m_kpreblur, m_kpreblur }, 0);
         }
+
+        // set loop iteration step
+        // this will skip points in the input image for significant speed-up
+        theMatcher.m_loopstep = theKnobs.get_loopstep();
 
         // then apply Generalized Hough transform and locate maximum (best match)
         theMatcher.apply_ghough(img_gray, img_grad, img_match);

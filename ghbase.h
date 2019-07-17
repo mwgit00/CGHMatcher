@@ -31,7 +31,7 @@ namespace ghalgo
     class LookupTable
     {
     public:
-        LookupTable() : max_votes(0), img_sz(0, 0) {}
+        LookupTable() { clear(); }
         virtual ~LookupTable() {}
         void clear()
         {
@@ -99,13 +99,14 @@ namespace ghalgo
     void apply_ghough_transform(
         const cv::Mat& rkeyimg,
         cv::Mat& rvotes,
-        const ghalgo::LookupTable& rtable)
+        const ghalgo::LookupTable& rtable,
+        const int ijstep = 1)
     {
         rvotes = cv::Mat::zeros(rkeyimg.size(), E_VOTE_IMG_TYPE);
-        for (int i = rtable.img_sz.height / 2; i < rkeyimg.rows - rtable.img_sz.height / 2; ++i)
+        for (int i = rtable.img_sz.height / 2; i < rkeyimg.rows - rtable.img_sz.height / 2; i += ijstep)
         {
             const T_KEY * pix = rkeyimg.ptr<T_KEY>(i);
-            for (int j = rtable.img_sz.width / 2; j < rkeyimg.cols - rtable.img_sz.width / 2; ++j)
+            for (int j = rtable.img_sz.width / 2; j < rkeyimg.cols - rtable.img_sz.width / 2; j += ijstep)
             {
                 // look up voting table for key
                 // iterate through the points (if any) and add votes
@@ -136,13 +137,14 @@ namespace ghalgo
     void apply_ghough_transform_allpix(
         const cv::Mat& rkeyimg,
         cv::Mat& rvotes,
-        const ghalgo::LookupTable& rtable)
+        const ghalgo::LookupTable& rtable,
+        const int ijstep = 1)
     {
         rvotes = cv::Mat::zeros(rkeyimg.size(), E_VOTE_IMG_TYPE);
-        for (int i = 1; i < (rkeyimg.rows - 1); ++i)
+        for (int i = 1; i < (rkeyimg.rows - 1); i += ijstep)
         {
             const T_KEY * pix = rkeyimg.ptr<T_KEY>(i);
-            for (int j = 1; j < (rkeyimg.cols - 1); ++j)
+            for (int j = 1; j < (rkeyimg.cols - 1); j += ijstep)
             {
                 // look up points associated with key
                 // iterate through the points and add votes
