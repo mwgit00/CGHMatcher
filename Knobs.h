@@ -49,6 +49,7 @@ public:
         OP_UPDATE,
         OP_RECORD,
         OP_MAKE_VIDEO,
+        OP_ASSIGN,
     };
 
     Knobs();
@@ -63,6 +64,9 @@ public:
 
     bool get_record_enabled(void) const { return is_record_enabled; }
     void toggle_record_enabled(void) { is_record_enabled = !is_record_enabled; }
+
+    bool get_acq_mode_enabled(void) const { return is_acq_mode_enabled; }
+    void toggle_acq_mode_enabled(void) { is_acq_mode_enabled = !is_acq_mode_enabled; }
 
     int get_pre_blur(void) const { return kpreblur; }
     void inc_pre_blur(void) { kpreblur = (kpreblur < 35) ? kpreblur + 2 : kpreblur; }
@@ -103,6 +107,9 @@ private:
 
     // Flag for enabling recording
     bool is_record_enabled;
+
+    // Flag for enabling mode where template image is acquired from camera
+    bool is_acq_mode_enabled;
 
     // Amount of Gaussian blurring in preprocessing step
     int kpreblur;

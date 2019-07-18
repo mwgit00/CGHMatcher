@@ -29,6 +29,7 @@ Knobs::Knobs() :
     is_op_required(false),
     is_equ_hist_enabled(false),
     is_record_enabled(false),
+    is_acq_mode_enabled(false),
     kpreblur(7),
     kcliplimit(4),
     nchannel(Knobs::ALL_CHANNELS),
@@ -61,6 +62,8 @@ void Knobs::show_help(void) const
     std::cout << "[ or ]    Adjust image scale (decrease, increase)" << std::endl;
     std::cout << "{ or }    Adjust Sobel kernel size (decrease, increase)" << std::endl;
     std::cout << "< or >    Adjust alorithm loop step (decrease, increase)" << std::endl;
+    std::cout << "A         Toggle acquisition from camera mode" << std::endl;
+    std::cout << "a         Assign new template from camera when acquisition mode enabled" << std::endl;
     std::cout << "e         Toggle histogram equalization" << std::endl;
     std::cout << "r         Toggle recording mode" << std::endl;
     std::cout << "t         Select next template from collection" << std::endl;
@@ -88,10 +91,10 @@ void Knobs::handle_keypress(const char ckey)
             set_channel(ckey - '1');
             break;
         }
-        case '7': set_output_mode(Knobs::OUT_RAW); break;
-        case '8': set_output_mode(Knobs::OUT_GRAD); break;
-        case '9': set_output_mode(Knobs::OUT_PREP); break;
-        case '0': set_output_mode(Knobs::OUT_COLOR); break;
+        case '7': if (!get_acq_mode_enabled()) set_output_mode(Knobs::OUT_RAW); break;
+        case '8': if (!get_acq_mode_enabled()) set_output_mode(Knobs::OUT_GRAD); break;
+        case '9': if (!get_acq_mode_enabled()) set_output_mode(Knobs::OUT_PREP); break;
+        case '0': if (!get_acq_mode_enabled()) set_output_mode(Knobs::OUT_COLOR); break;
         case '+': inc_clip_limit(); break;
         case '_': dec_clip_limit(); break;
         case ']': inc_img_scale(); break;
@@ -128,6 +131,24 @@ void Knobs::handle_keypress(const char ckey)
         case '<':
         {
             dec_loopstep();
+            break;
+        }
+        case 'A':
+        {
+            // always use COLOR output mode when acquisition is enabled
+            // the output mode buttons will be disabled (see above)
+            set_output_mode(Knobs::OUT_COLOR);
+            toggle_acq_mode_enabled();
+            break;
+        }
+        case 'a':
+        {
+            if (get_acq_mode_enabled())
+            {
+                is_op_required = true;
+                op_id = Knobs::OP_ASSIGN;
+                toggle_acq_mode_enabled();
+            }
             break;
         }
         case 'e':

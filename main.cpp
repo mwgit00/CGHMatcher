@@ -53,6 +53,7 @@ using namespace cv;
 
 
 Mat template_image;
+Rect g_rect_acquire;
 ghalgo::GradientMatcher theMatcher;
 const char * stitle = "CGHMatcher";
 const double default_mag_thr = 0.2;
@@ -104,18 +105,6 @@ static void image_output(
     const int h_score = 16;
     const int w_score = 40;
 
-    // determine size of "target" box
-    Size rsz = theMatcher.m_ghtable.img_sz;
-    Point corner = { rptmax.x - rsz.width / 2, rptmax.y - rsz.height / 2 };
-
-    // a loop step of 2 means 1/4 of the pixels will be processed, 3 means 1/9 will be processed, etc.
-    // so the score must be adjusted by the squared loop step to keep it consistent for different step values
-    double step_scale = static_cast<double>(theMatcher.m_loopstep * theMatcher.m_loopstep);
-
-    // format score string for viewer (#.##)
-    std::ostringstream oss;
-    oss << std::fixed << std::setprecision(2) << ((qmax / theMatcher.m_max_votes) * step_scale);
-
     // draw current template in upper right corner
     Mat bgr_template_img;
     cvtColor(template_image, bgr_template_img, COLOR_GRAY2BGR);
@@ -128,16 +117,40 @@ static void image_output(
     cv::Scalar box_color = (rknobs.get_record_enabled()) ? SCA_MAGENTA : SCA_BLUE;
     rectangle(rimg, { osz.width - tsz.width, 0 }, { osz.width, tsz.height }, box_color, 2);
 
-    // draw black background box then draw text score on top of it
-    // dispaly location is adjusted based on visible corners (default is upper left)
-    int score_y = (corner.y > h_score) ? (corner.y - h_score) : (corner.y + rsz.height);
-    int score_x = (corner.x > 0) ? corner.x : corner.x + rsz.width - w_score;
-    rectangle(rimg, { score_x, score_y, 40, h_score }, SCA_BLACK, -1);
-    putText(rimg, oss.str(), { score_x, score_y + h_score - 4 }, FONT_HERSHEY_PLAIN, 1.0, SCA_WHITE, 1);
+    if (rknobs.get_acq_mode_enabled())
+    {
+        // draw rectangle for acquisition region
+        const int ndiv = 40;
+        int xacq = (rimg.size().width / 2) - ndiv;// ((rimg.size().width / ndiv) / 2);
+        int yacq = (rimg.size().height / 2) - ndiv; // ((rimg.size().height / ndiv) / 2);
+        g_rect_acquire = Rect(xacq, yacq, ndiv * 2, ndiv * 2); // rimg.size().width / ndiv, rimg.size().height / ndiv);
+        rectangle(rimg, g_rect_acquire, SCA_GREEN, 3);
+    }
+    else
+    {
+        // determine size of "target" box
+        Size rsz = theMatcher.m_ghtable.img_sz;
+        Point corner = { rptmax.x - rsz.width / 2, rptmax.y - rsz.height / 2 };
 
-    // draw rectangle around best match with yellow dot at center
-    rectangle(rimg, Rect(corner.x, corner.y, rsz.width, rsz.height), SCA_GREEN, 2);
-    circle(rimg, rptmax, 2, SCA_YELLOW, -1);
+        // a loop step of 2 means 1/4 of the pixels will be processed, 3 means 1/9 will be processed, etc.
+        // so the score can be adjusted by the squared loop step to keep it consistent for different step values
+        double step_scale = static_cast<double>(theMatcher.m_loopstep * theMatcher.m_loopstep);
+
+        // format score string for viewer (#.##)
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(2) << ((qmax / theMatcher.m_max_votes) * step_scale);
+
+        // draw black background box then draw text score on top of it
+        // dispaly location is adjusted based on visible corners (default is upper left)
+        int score_y = (corner.y > h_score) ? (corner.y - h_score) : (corner.y + rsz.height);
+        int score_x = (corner.x > 0) ? corner.x : corner.x + rsz.width - w_score;
+        rectangle(rimg, { score_x, score_y, 40, h_score }, SCA_BLACK, -1);
+        putText(rimg, oss.str(), { score_x, score_y + h_score - 4 }, FONT_HERSHEY_PLAIN, 1.0, SCA_WHITE, 1);
+
+        // draw rectangle around best match with yellow dot at center
+        rectangle(rimg, Rect(corner.x, corner.y, rsz.width, rsz.height), SCA_GREEN, 2);
+        circle(rimg, rptmax, 2, SCA_YELLOW, -1);
+    }
 
     // save each frame to a file if recording
     if (rknobs.get_record_enabled())
@@ -211,6 +224,16 @@ static void loop(void)
 
     while (is_running)
     {
+        // grab image
+        vcap >> img;
+
+        // apply the current image scale setting
+        double img_scale = theKnobs.get_img_scale();
+        Size viewer_size = Size(
+            static_cast<int>(capture_size.width * img_scale),
+            static_cast<int>(capture_size.height * img_scale));
+        resize(img, img_viewer, viewer_size);
+
         int m_kpreblur = theKnobs.get_pre_blur();
         int m_ksobel = static_cast<int>(theKnobs.get_ksobel());
 
@@ -251,17 +274,15 @@ static void loop(void)
                     listOfPNG);
                 std::cout << ((is_ok) ? "SUCCESS!" : "FAILURE!") << std::endl;
             }
+            else if (op_id == Knobs::OP_ASSIGN)
+            {
+                Mat acq_img = img_viewer(g_rect_acquire);
+                cvtColor(acq_img, template_image, COLOR_BGR2GRAY);
+                theMatcher.init_ghough_table_from_img(template_image);
+                std::cout << "New template acquired from camera" << std::endl;
+            }
         }
 
-        // grab image
-        vcap >> img;
-
-        // apply the current image scale setting
-        double img_scale = theKnobs.get_img_scale();
-        Size viewer_size = Size(
-            static_cast<int>(capture_size.width * img_scale),
-            static_cast<int>(capture_size.height * img_scale));
-        resize(img, img_viewer, viewer_size);
 
         // apply the current channel setting
         int nchan = theKnobs.get_channel();
@@ -301,7 +322,13 @@ static void loop(void)
 
         // apply the current output mode
         // content varies but all final output images are BGR
-        switch (theKnobs.get_output_mode())
+        int nmode = theKnobs.get_output_mode();
+        if (theKnobs.get_acq_mode_enabled())
+        {
+            nmode = Knobs::OUT_COLOR;
+        }
+        
+        switch (nmode)
         {
             case Knobs::OUT_RAW:
             {
