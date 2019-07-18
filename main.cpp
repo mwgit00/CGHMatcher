@@ -234,8 +234,34 @@ static void loop(void)
             static_cast<int>(capture_size.height * img_scale));
         resize(img, img_viewer, viewer_size);
 
-        int m_kpreblur = theKnobs.get_pre_blur();
-        int m_ksobel = static_cast<int>(theKnobs.get_ksobel());
+        // apply the current channel setting
+        int nchan = theKnobs.get_channel();
+        if (nchan == Knobs::ALL_CHANNELS)
+        {
+            // combine all channels into grayscale
+            cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
+        }
+        else
+        {
+            // select only one BGR channel
+            split(img_viewer, img_channels);
+            img_gray = img_channels[nchan];
+        }
+
+        // apply the current histogram equalization setting
+        if (theKnobs.get_equ_hist_enabled())
+        {
+            double c = theKnobs.get_clip_limit();
+            pCLAHE->setClipLimit(c);
+            pCLAHE->apply(img_gray, img_gray);
+        }
+
+        // apply the current blur setting
+        int kpreblur = theKnobs.get_pre_blur();
+        if (kpreblur > 1)
+        {
+            GaussianBlur(img_gray, img_gray, { kpreblur, kpreblur }, 0);
+        }
 
         // check for any operations that
         // might halt or reset the image processing loop
@@ -276,47 +302,21 @@ static void loop(void)
             }
             else if (op_id == Knobs::OP_ASSIGN)
             {
-                Mat acq_img = img_viewer(g_rect_acquire);
-                cvtColor(acq_img, template_image, COLOR_BGR2GRAY);
-                theMatcher.init_ghough_table_from_img(template_image);
+                // use the PRE-PROCESSED image in the acquisition rectangle as the new template
+                // apply the current Sobel filter size since this is used directly in the gradient calc
+                Mat acq_img = img_gray(g_rect_acquire);
+                theMatcher.m_ksobel = theKnobs.get_ksobel();
+                theMatcher.m_magthr = default_mag_thr;
+                theMatcher.init_ghough_table_from_img(acq_img);
+                acq_img.copyTo(template_image);
                 std::cout << "New template acquired from camera" << std::endl;
             }
         }
 
-
-        // apply the current channel setting
-        int nchan = theKnobs.get_channel();
-        if (nchan == Knobs::ALL_CHANNELS)
-        {
-            // combine all channels into grayscale
-            cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
-        }
-        else
-        {
-            // select only one BGR channel
-            split(img_viewer, img_channels);
-            img_gray = img_channels[nchan];
-        }
-
-        // apply the current histogram equalization setting
-        if (theKnobs.get_equ_hist_enabled())
-        {
-            double c = theKnobs.get_clip_limit();
-            pCLAHE->setClipLimit(c);
-            pCLAHE->apply(img_gray, img_gray);
-        }
-
-        // apply the current blur setting
-        if (m_kpreblur > 1)
-        {
-            GaussianBlur(img_gray, img_gray, { m_kpreblur, m_kpreblur }, 0);
-        }
-
         // set loop iteration step
         // this will skip points in the input image for significant speed-up
-        theMatcher.m_loopstep = theKnobs.get_loopstep();
-
         // then apply Generalized Hough transform and locate maximum (best match)
+        theMatcher.m_loopstep = theKnobs.get_loopstep();
         theMatcher.apply_ghough(img_gray, img_grad, img_match);
         minMaxLoc(img_match, nullptr, &qmax, nullptr, &ptmax);
 

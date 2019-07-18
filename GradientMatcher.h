@@ -42,7 +42,9 @@ namespace ghalgo
             const int kblur = 7,
             const int ksobel = 7,
             const double magthr = 0.2,
-            const double angstep = 8.0);
+            const double angstep = 8.0,
+            const bool is_pre_CLAHE_enabled = false,
+            const int CLAHE_clip_limit = 4);
 
         // This is the preprocessing step for the "classic" Generalized Hough algorithm.
         // Calculates Sobel derivatives of input grayscale image.  Converts to polar coordinates and
@@ -69,9 +71,11 @@ namespace ghalgo
 
         int m_kpreblur;
         int m_ksobel;
-
         double m_magthr;
         double m_angstep;
+        bool m_is_pre_CLAHE_enabled;
+        int m_CLAHE_clip_limit;
+
         double m_max_votes;
 
         int m_loopstep;

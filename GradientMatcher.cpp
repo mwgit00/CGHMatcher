@@ -41,12 +41,18 @@ namespace ghalgo
         const int kblur,
         const int ksobel,
         const double magthr,
-        const double angstep)
+        const double angstep,
+        const bool is_pre_CLAHE_enabled,
+        const int CLAHE_clip_limit)
     {
+        // parameters for generating a template
         m_kpreblur = kblur;
         m_ksobel = ksobel;
         m_magthr = magthr;
         m_angstep = angstep;
+        m_is_pre_CLAHE_enabled = is_pre_CLAHE_enabled;
+        m_CLAHE_clip_limit = CLAHE_clip_limit;
+        
         m_max_votes = 0.0;
         m_loopstep = 1;
         m_ghtable.clear();
@@ -91,19 +97,15 @@ namespace ghalgo
 
     void GradientMatcher::init_ghough_table_from_img(const cv::Mat& rimg)
     {
-        cv::Mat img_blur;
         cv::Mat img_cgrad;
-        cv::Mat img_match;
 
-        // apply the pre-blur setting since processing loop also does a pre-blur
-        GaussianBlur(rimg, img_blur, { m_kpreblur, m_kpreblur }, 0);
-        
         // create image of encoded Sobel gradient orientations from input image
         // then create Generalized Hough lookup table from that image
-        create_masked_gradient_orientation_img(img_blur, img_cgrad);
+        create_masked_gradient_orientation_img(rimg, img_cgrad);
 
         // key is 8-bit
         // max key is angle steps + 1 because both 0 and 2pi can come from polar conversion
+        // the 0 and 2pi values are equivalent but it's one extra "key" that must be handled
         ghalgo::create_lookup_table(img_cgrad, static_cast<uint8_t>(m_angstep + 1.0), m_ghtable);
 
         // stash floating point value of ideal max votes
@@ -132,6 +134,25 @@ namespace ghalgo
         cv::Mat scaled_template_image;
         resize(template_image, scaled_template_image, cv::Size(), prescale, prescale, (prescale > 1.0) ? cv::INTER_CUBIC : cv::INTER_AREA);
 
+        // GH pipeline should do the following:
+        // get gray image -> perform optional histogram equalization -> perform pre-blur -> do GH
+
+        // apply the optional histogram equalization setting
+        if (m_is_pre_CLAHE_enabled)
+        {
+            cv::Ptr<cv::CLAHE> pCLAHE = cv::createCLAHE();
+            pCLAHE->setClipLimit(static_cast<double>(m_CLAHE_clip_limit));
+            pCLAHE->apply(scaled_template_image, scaled_template_image);
+        }
+
+        // apply the pre-blur setting
+        if (m_kpreblur > 1)
+        {
+            GaussianBlur(scaled_template_image, scaled_template_image, { m_kpreblur, m_kpreblur }, 0);
+        }
+
+        // now that image has been pre-processed according to steps above
+        // use it to generate the lookup table
         init_ghough_table_from_img(scaled_template_image);
     }
 }
