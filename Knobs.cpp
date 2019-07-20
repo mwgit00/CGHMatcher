@@ -27,6 +27,7 @@
 
 Knobs::Knobs() :
     is_op_required(false),
+    is_template_display_enabled(true),
     is_equ_hist_enabled(false),
     is_record_enabled(false),
     is_acq_mode_enabled(false),
@@ -62,8 +63,10 @@ void Knobs::show_help(void) const
     std::cout << "[ or ]    Adjust image scale (decrease, increase)" << std::endl;
     std::cout << "{ or }    Adjust Sobel kernel size (decrease, increase)" << std::endl;
     std::cout << "< or >    Adjust alorithm loop step (decrease, increase)" << std::endl;
-    std::cout << "A         Toggle acquisition from camera mode" << std::endl;
-    std::cout << "a         Assign new template from camera when acquisition mode enabled" << std::endl;
+    std::cout << "a         Toggle acquisition-from-camera mode" << std::endl;
+    std::cout << "            - Click Left mouse button to select corners" << std::endl;
+    std::cout << "            - Double-click left mouse button to apply new template" << std::endl;
+    std::cout << "d         Toggle template image display in upper right corner" << std::endl;
     std::cout << "e         Toggle histogram equalization" << std::endl;
     std::cout << "r         Toggle recording mode" << std::endl;
     std::cout << "t         Select next template from collection" << std::endl;
@@ -133,7 +136,7 @@ void Knobs::handle_keypress(const char ckey)
             dec_loopstep();
             break;
         }
-        case 'A':
+        case 'a':
         {
             // always use COLOR output mode when acquisition is enabled
             // the output mode buttons will be disabled (see above)
@@ -141,14 +144,9 @@ void Knobs::handle_keypress(const char ckey)
             toggle_acq_mode_enabled();
             break;
         }
-        case 'a':
+        case 'd':
         {
-            if (get_acq_mode_enabled())
-            {
-                is_op_required = true;
-                op_id = Knobs::OP_ASSIGN;
-                toggle_acq_mode_enabled();
-            }
+            toggle_template_display_enabled();
             break;
         }
         case 'e':

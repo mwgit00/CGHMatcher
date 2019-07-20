@@ -49,7 +49,6 @@ public:
         OP_UPDATE,
         OP_RECORD,
         OP_MAKE_VIDEO,
-        OP_ASSIGN,
     };
 
     Knobs();
@@ -58,6 +57,9 @@ public:
     void show_help(void) const;
 
     bool get_op_flag(int& ropid);
+
+    bool get_template_display_enabled(void) const { return is_template_display_enabled; }
+    void toggle_template_display_enabled(void) { is_template_display_enabled = !is_template_display_enabled; }
 
     bool get_equ_hist_enabled(void) const { return is_equ_hist_enabled; }
     void toggle_equ_hist_enabled(void) { is_equ_hist_enabled = !is_equ_hist_enabled; }
@@ -101,6 +103,9 @@ private:
     // One-shot flag for signaling when extra operation needs to be done
     // before continuing image processing loop
     bool is_op_required;
+
+    // Flag for displaying template in upper right corner of viewer
+    bool is_template_display_enabled;
 
     // Flag for enabling histogram equalization
     bool is_equ_hist_enabled;

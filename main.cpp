@@ -35,7 +35,7 @@
 #include "util.h"
 
 
-#define MATCH_DISPLAY_THRESHOLD (0.8)           // arbitrary
+#define MATCH_DISPLAY_THRESHOLD (0.9)           // arbitrary
 #define MOVIE_PATH              ".\\movie\\"    // user may need to create or change this
 #define DATA_PATH               ".\\data\\"     // user may need to change this
 
@@ -52,8 +52,43 @@ using namespace cv;
 #define SCA_WHITE   (cv::Scalar(255,255,255))
 
 
+class MouseInfo
+{
+public:
+    enum
+    {
+        MOFF = 0,
+        MPT0 = 1,
+        MMOV = 2,
+        MPT1 = 3,
+        MACQ = 4,
+    };
+    cv::Point pt0;
+    cv::Point pt1;
+    cv::Rect rect;
+    int mstate;
+    
+    MouseInfo() { clear(); }
+    virtual ~MouseInfo() {}
+    void apply(bool x)
+    {
+        if (x)
+        {
+            if (mstate == MOFF) mstate = MPT0;
+        }
+        else
+        {
+            if (mstate != MOFF) clear();
+        }
+    }
+    void clear() { pt0 = cv::Point(); pt1 = cv::Point(); rect = cv::Rect(); mstate = MOFF; }
+};
+
+
 Mat template_image;
-Rect g_rect_acquire;
+Size g_viewer_size;
+MouseInfo g_mouse_info;
+
 ghalgo::GradientMatcher theMatcher;
 const char * stitle = "CGHMatcher";
 const double default_mag_thr = 0.2;
@@ -96,38 +131,82 @@ static bool wait_and_check_keys(Knobs& rknobs)
 }
 
 
+static void CallBackFunc(int event, int x, int y, int flags, void* userdata)
+{
+    MouseInfo * pmi = reinterpret_cast<MouseInfo *>(userdata);
+    if (pmi->mstate)
+    {
+        if (event == EVENT_LBUTTONDOWN)
+        {
+            if (pmi->mstate == MouseInfo::MPT0)
+            {
+                pmi->pt0 = Point(x, y);
+                pmi->pt1 = Point(x, y);
+                pmi->rect = Rect(pmi->pt0, pmi->pt1);
+                pmi->mstate = MouseInfo::MMOV;
+            }
+        }
+        else if (event == EVENT_LBUTTONUP)
+        {
+            if (pmi->mstate == MouseInfo::MMOV)
+            {
+                pmi->pt1 = Point(x, y);
+                pmi->rect = Rect(pmi->pt0, pmi->pt1);
+                pmi->mstate = MouseInfo::MPT1;
+            }
+        }
+        else if (event == EVENT_MOUSEMOVE)
+        {
+            if (pmi->mstate == MouseInfo::MMOV)
+            {
+                pmi->pt1 = Point(x, y);
+                pmi->rect = Rect(pmi->pt0, pmi->pt1);
+            }
+        }
+        else if (event = EVENT_LBUTTONDBLCLK)
+        {
+            if (pmi->mstate == MouseInfo::MPT1)
+            {
+                pmi->mstate = MouseInfo::MACQ;
+            }
+        }
+    }
+}
+
+
 static void image_output(
     Mat& rimg,
     const double qmax,
     const Point& rptmax,
     const Knobs& rknobs)
 {
-    const int h_score = 16;
-    const int w_score = 40;
-
-    // draw current template in upper right corner
-    Mat bgr_template_img;
-    cvtColor(template_image, bgr_template_img, COLOR_GRAY2BGR);
-    Size osz = rimg.size();
-    Size tsz = template_image.size();
-    Rect roi = cv::Rect(osz.width - tsz.width, 0, tsz.width, tsz.height);
-    bgr_template_img.copyTo(rimg(roi));
-
-    // draw colored box around template image (magenta if recording)
-    cv::Scalar box_color = (rknobs.get_record_enabled()) ? SCA_MAGENTA : SCA_BLUE;
-    rectangle(rimg, { osz.width - tsz.width, 0 }, { osz.width, tsz.height }, box_color, 2);
-
     if (rknobs.get_acq_mode_enabled())
     {
         // draw rectangle for acquisition region
-        const int ndiv = 40;
-        int xacq = (rimg.size().width / 2) - ndiv;// ((rimg.size().width / ndiv) / 2);
-        int yacq = (rimg.size().height / 2) - ndiv; // ((rimg.size().height / ndiv) / 2);
-        g_rect_acquire = Rect(xacq, yacq, ndiv * 2, ndiv * 2); // rimg.size().width / ndiv, rimg.size().height / ndiv);
-        rectangle(rimg, g_rect_acquire, SCA_GREEN, 3);
+        // and a blue box around entire screen
+        rectangle(rimg, g_mouse_info.rect, SCA_GREEN, 3);
+        rectangle(rimg, Rect(0, 0, rimg.size().width, rimg.size().height), SCA_BLUE, 3);
     }
     else
     {
+        const int h_score = 16;
+        const int w_score = 40;
+
+        if (rknobs.get_template_display_enabled())
+        {
+            // draw current template in upper right corner
+            Mat bgr_template_img;
+            cvtColor(template_image, bgr_template_img, COLOR_GRAY2BGR);
+            Size osz = rimg.size();
+            Size tsz = template_image.size();
+            Rect roi = cv::Rect(osz.width - tsz.width, 0, tsz.width, tsz.height);
+            bgr_template_img.copyTo(rimg(roi));
+
+            // draw colored box around template image (magenta if recording)
+            cv::Scalar box_color = (rknobs.get_record_enabled()) ? SCA_MAGENTA : SCA_BLUE;
+            rectangle(rimg, { osz.width - tsz.width, 0 }, { osz.width, tsz.height }, box_color, 2);
+        }
+
         // determine size of "target" box
         Size rsz = theMatcher.m_ghtable.img_sz;
         Point corner = { rptmax.x - rsz.width / 2, rptmax.y - rsz.height / 2 };
@@ -196,9 +275,14 @@ static void loop(void)
     Mat img_channels[3];
     Mat img_match;
 
+    // set up mouse callback
+    namedWindow(stitle);
+    setMouseCallback(stitle, CallBackFunc, &g_mouse_info);
+
+    // create a histogram equalizer
     Ptr<CLAHE> pCLAHE = createCLAHE();
 
-    // need a 0 as argument
+    // need a 0 as argument for the video capture thing
     VideoCapture vcap(0);
     if (!vcap.isOpened())
     {
@@ -229,10 +313,10 @@ static void loop(void)
 
         // apply the current image scale setting
         double img_scale = theKnobs.get_img_scale();
-        Size viewer_size = Size(
+        g_viewer_size = Size(
             static_cast<int>(capture_size.width * img_scale),
             static_cast<int>(capture_size.height * img_scale));
-        resize(img, img_viewer, viewer_size);
+        resize(img, img_viewer, g_viewer_size);
 
         // apply the current channel setting
         int nchan = theKnobs.get_channel();
@@ -300,17 +384,20 @@ static void loop(void)
                     listOfPNG);
                 std::cout << ((is_ok) ? "SUCCESS!" : "FAILURE!") << std::endl;
             }
-            else if (op_id == Knobs::OP_ASSIGN)
-            {
-                // use the PRE-PROCESSED image in the acquisition rectangle as the new template
-                // apply the current Sobel filter size since this is used directly in the gradient calc
-                Mat acq_img = img_gray(g_rect_acquire);
-                theMatcher.m_ksobel = theKnobs.get_ksobel();
-                theMatcher.m_magthr = default_mag_thr;
-                theMatcher.init_ghough_table_from_img(acq_img);
-                acq_img.copyTo(template_image);
-                std::cout << "New template acquired from camera" << std::endl;
-            }
+        }
+
+        if (g_mouse_info.mstate == MouseInfo::MACQ)
+        {
+            // use the PRE-PROCESSED image in the acquisition rectangle as the new template
+            // apply the current Sobel filter size since this is used directly in the gradient calc
+            Mat acq_img = img_gray(g_mouse_info.rect);
+            theMatcher.m_ksobel = theKnobs.get_ksobel();
+            theMatcher.m_magthr = default_mag_thr;
+            theMatcher.init_ghough_table_from_img(acq_img);
+            acq_img.copyTo(template_image);
+            theKnobs.toggle_acq_mode_enabled();
+            g_mouse_info.apply(false);
+            std::cout << "New template acquired from camera" << std::endl;
         }
 
         // set loop iteration step
@@ -323,6 +410,7 @@ static void loop(void)
         // apply the current output mode
         // content varies but all final output images are BGR
         int nmode = theKnobs.get_output_mode();
+        g_mouse_info.apply(theKnobs.get_acq_mode_enabled());
         if (theKnobs.get_acq_mode_enabled())
         {
             nmode = Knobs::OUT_COLOR;
