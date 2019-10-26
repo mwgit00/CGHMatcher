@@ -5,6 +5,6 @@ This is a cleaned up implementation of the old BGHMatcher code.  The abstract Ge
 
 There is a new "loop step" setting which can speed up the processing by skipping every 2nd, 3rd, or 4th row/column in the input image.  A by-product of the blurring steps is a lot of redundant votes.  Skipping rows/columns can still provide good results for large templates.
 
-Template initialization has been reworked.  The test program has a new "acquisition" mode where a user can draw a rectangle with the mouse and then double-click to apply the image in the rectangle as the new template.
+Template initialization has been reworked.  The test program has a new "acquisition" mode where a user can draw a rectangle with the mouse in the viewing window and then double-click to apply the image in the rectangle as the new template.
 
-The code has been tested on a Windows 7 machine with Visual Studio Community Edition 2015 and OpenCV 4.1.0.
+The code has been tested with OpenCV 4.1.0 on a Windows 7 machine with Visual Studio 2015 and a Windows 10 machine with Visual Studio 2019.  I use the Community edition of Visual Studio.
