@@ -259,6 +259,40 @@ static void reload_template(
 }
 
 
+static void pre_process(Knobs& rknobs, Ptr<CLAHE>& rpCLAHE, cv::Mat& rimg_cam, cv::Mat& rimg_gray)
+{
+    // apply the current channel setting
+    int nchan = rknobs.get_channel();
+    if (nchan == Knobs::ALL_CHANNELS)
+    {
+        // combine all channels into grayscale
+        cvtColor(rimg_cam, rimg_gray, COLOR_BGR2GRAY);
+    }
+    else
+    {
+        // select only one BGR channel
+        Mat img_channels[3];
+        split(rimg_cam, img_channels);
+        rimg_gray = img_channels[nchan];
+    }
+
+    // apply the current histogram equalization setting
+    if (rknobs.get_equ_hist_enabled())
+    {
+        double c = rknobs.get_clip_limit();
+        rpCLAHE->setClipLimit(c);
+        rpCLAHE->apply(rimg_gray, rimg_gray);
+    }
+
+    // apply the current blur setting
+    int kpreblur = rknobs.get_pre_blur();
+    if (kpreblur > 1)
+    {
+        GaussianBlur(rimg_gray, rimg_gray, { kpreblur, kpreblur }, 0);
+    }
+}
+
+
 static void loop(void)
 {
     Knobs theKnobs;
@@ -272,7 +306,6 @@ static void loop(void)
     Mat img_viewer;
     Mat img_gray;
     Mat img_grad;
-    Mat img_channels[3];
     Mat img_match;
 
     // set up mouse callback
@@ -291,7 +324,7 @@ static void loop(void)
         return;
         ///////
     }
-
+    
     // camera is ready so grab a first image to determine its full size
     vcap >> img;
     capture_size = img.size();
@@ -318,34 +351,7 @@ static void loop(void)
             static_cast<int>(capture_size.height * img_scale));
         resize(img, img_viewer, g_viewer_size);
 
-        // apply the current channel setting
-        int nchan = theKnobs.get_channel();
-        if (nchan == Knobs::ALL_CHANNELS)
-        {
-            // combine all channels into grayscale
-            cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
-        }
-        else
-        {
-            // select only one BGR channel
-            split(img_viewer, img_channels);
-            img_gray = img_channels[nchan];
-        }
-
-        // apply the current histogram equalization setting
-        if (theKnobs.get_equ_hist_enabled())
-        {
-            double c = theKnobs.get_clip_limit();
-            pCLAHE->setClipLimit(c);
-            pCLAHE->apply(img_gray, img_gray);
-        }
-
-        // apply the current blur setting
-        int kpreblur = theKnobs.get_pre_blur();
-        if (kpreblur > 1)
-        {
-            GaussianBlur(img_gray, img_gray, { kpreblur, kpreblur }, 0);
-        }
+        pre_process(theKnobs, pCLAHE, img_viewer, img_gray);
 
         // check for any operations that
         // might halt or reset the image processing loop
