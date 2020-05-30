@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2019 Mark Whitney
+// Copyright(c) 2020 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -70,6 +70,9 @@ public:
     bool get_acq_mode_enabled(void) const { return is_acq_mode_enabled; }
     void toggle_acq_mode_enabled(void) { is_acq_mode_enabled = !is_acq_mode_enabled; }
 
+    bool get_feedback_mode_enabled(void) const { return is_feedback_mode_enabled; }
+    void toggle_feedback_mode_enabled(void) { is_feedback_mode_enabled = !is_feedback_mode_enabled; }
+
     int get_pre_blur(void) const { return kpreblur; }
     void inc_pre_blur(void) { kpreblur = (kpreblur < 35) ? kpreblur + 2 : kpreblur; }
     void dec_pre_blur(void) { kpreblur = (kpreblur > 1) ? kpreblur - 2 : kpreblur; };
@@ -115,6 +118,9 @@ private:
 
     // Flag for enabling mode where template image is acquired from camera
     bool is_acq_mode_enabled;
+
+    // Flag for enabling mode where match image is fed back as template image
+    bool is_feedback_mode_enabled;
 
     // Amount of Gaussian blurring in preprocessing step
     int kpreblur;

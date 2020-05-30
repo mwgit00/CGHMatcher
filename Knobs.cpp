@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2019 Mark Whitney
+// Copyright(c) 2020 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,7 @@ Knobs::Knobs() :
     is_equ_hist_enabled(false),
     is_record_enabled(false),
     is_acq_mode_enabled(false),
+    is_feedback_mode_enabled(false),
     kpreblur(7),
     kcliplimit(4),
     nchannel(Knobs::ALL_CHANNELS),
@@ -68,6 +69,7 @@ void Knobs::show_help(void) const
     std::cout << "            - Double-click left mouse button to apply new template" << std::endl;
     std::cout << "d         Toggle template image display in upper right corner" << std::endl;
     std::cout << "e         Toggle histogram equalization" << std::endl;
+    std::cout << "f         Toggle feedback mode" << std::endl;
     std::cout << "r         Toggle recording mode" << std::endl;
     std::cout << "t         Select next template from collection" << std::endl;
     std::cout << "u         Update Hough lookup table from current settings" << std::endl;
@@ -144,6 +146,12 @@ void Knobs::handle_keypress(const char ckey)
             toggle_acq_mode_enabled();
             break;
         }
+        case 'f':
+        {
+            toggle_feedback_mode_enabled();
+            is_template_display_enabled = false;
+            break;
+        }
         case 'd':
         {
             toggle_template_display_enabled();
@@ -205,6 +213,7 @@ void Knobs::handle_keypress(const char ckey)
         std::cout << "  Out=" << sout[noutmode];
         std::cout << "  Scale=" << vimgscale[nimgscale];
         std::cout << "  Step=" << nloopstep;
+        std::cout << "  Fb=" << is_feedback_mode_enabled;
         std::cout << std::endl;
     }
 }

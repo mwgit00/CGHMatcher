@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2019 Mark Whitney
+// Copyright(c) 2020 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,7 @@
 #include <sstream>
 #include <iomanip>
 #include <vector>
+#include <list>
 
 #include "GradientMatcher.h"
 #include "Knobs.h"
@@ -49,6 +50,7 @@ using namespace cv;
 #define SCA_BLUE    (cv::Scalar(255,0,0))
 #define SCA_MAGENTA (cv::Scalar(255,0,255))
 #define SCA_YELLOW  (cv::Scalar(0,255,255))
+#define SCA_YELLOW2 (cv::Scalar(0,192,192))
 #define SCA_WHITE   (cv::Scalar(255,255,255))
 
 
@@ -94,6 +96,9 @@ const char * stitle = "CGHMatcher";
 const double default_mag_thr = 0.2;
 int n_record_ctr = 0;
 size_t nfile = 0;
+
+std::list<Point> ptfifo;
+const size_t ptfifosz = 7;
 
 
 const std::vector<T_file_info> vfiles =
@@ -174,6 +179,16 @@ static void CallBackFunc(int event, int x, int y, int flags, void* userdata)
 }
 
 
+static void update_ptfifo(const Point& rpt)
+{
+    ptfifo.push_back(rpt);
+    if (ptfifo.size() == ptfifosz)
+    {
+        ptfifo.pop_front();
+    }
+}
+
+
 static void image_output(
     Mat& rimg,
     const double qmax,
@@ -228,6 +243,10 @@ static void image_output(
 
         // draw rectangle around best match with yellow dot at center
         rectangle(rimg, Rect(corner.x, corner.y, rsz.width, rsz.height), SCA_GREEN, 2);
+        for (const auto& rpt : ptfifo)
+        {
+            circle(rimg, rpt, 2, SCA_YELLOW2, -1);
+        }
         circle(rimg, rptmax, 2, SCA_YELLOW, -1);
     }
 
@@ -383,10 +402,10 @@ static void loop(void)
             {
                 std::cout << "CREATING VIDEO FILE..." << std::endl;
                 std::list<std::string> listOfPNG;
-                get_dir_list(MOVIE_PATH, "*.jpg", listOfPNG);
-                bool is_ok = make_video(5.0, MOVIE_PATH,
+                get_dir_list(MOVIE_PATH, "*.png", listOfPNG);
+                bool is_ok = make_video(15.0, MOVIE_PATH,
                     "movie.mov",
-                    VideoWriter::fourcc('M', 'P', '4', 'V'),
+                    VideoWriter::fourcc('m', 'p', '4', 'v'),
                     listOfPNG);
                 std::cout << ((is_ok) ? "SUCCESS!" : "FAILURE!") << std::endl;
             }
@@ -412,6 +431,20 @@ static void loop(void)
         theMatcher.m_loopstep = theKnobs.get_loopstep();
         theMatcher.apply_ghough(img_gray, img_grad, img_match);
         minMaxLoc(img_match, nullptr, &qmax, nullptr, &ptmax);
+        update_ptfifo(ptmax);
+
+        if (theKnobs.get_feedback_mode_enabled())
+        {
+            const double BOUNDS = 0.2;
+            Size tsz = g_viewer_size;
+            int woff = static_cast<int>(tsz.width * BOUNDS);
+            int hoff = static_cast<int>(tsz.height * BOUNDS);
+            Size tsz0 = { tsz.width - woff, tsz.height - hoff };
+            Point tpt0 = { (woff / 2), (hoff / 2) };
+            Rect qrectex = Rect(tpt0, tsz0);
+            Mat imgex = img_gray(qrectex);
+            theMatcher.init_ghough_table_from_img(imgex);
+        }
 
         // apply the current output mode
         // content varies but all final output images are BGR

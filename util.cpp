@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2019 Mark Whitney
+// Copyright(c) 2020 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -67,6 +67,7 @@ bool make_video(
     const int iFOURCC,
     const std::list<std::string>& rListOfPNG)
 {
+    const double img_scale = 1.0;
     bool result = false;
     
     // determine size of frames from first image in list
@@ -75,13 +76,10 @@ bool make_video(
     cv::Mat img = cv::imread(rs);
     cv::Size img_sz = img.size();
 
-    cv::Mat img_viewer;
-    double img_scale = 0.25;
+    // get rescaled size
     cv::Size viewer_size = cv::Size(
         static_cast<int>(img_sz.width * img_scale),
         static_cast<int>(img_sz.height * img_scale));
-    //cv::resize(img, img_viewer, viewer_size);
-
 
     std::string sname = rspath + "\\" + rsname;
 
@@ -95,10 +93,8 @@ bool make_video(
             cv::Mat img = cv::imread(r);
             cv::Mat img_viewer;
             cv::resize(img, img_viewer, viewer_size);
-
             vw.write(img_viewer);
         }
-        
         result = true;
     }
 
