@@ -435,6 +435,8 @@ static void loop(void)
 
         if (theKnobs.get_feedback_mode_enabled())
         {
+            // extact smaller region centered in current image
+            // and make it the new template
             const double BOUNDS = 0.2;
             Size tsz = g_viewer_size;
             int woff = static_cast<int>(tsz.width * BOUNDS);
