@@ -9,11 +9,10 @@ Template initialization has been reworked.  The test program has a new "acquisit
 
 The code has been tested with OpenCV 4.1.0 on a Windows 7 machine with Visual Studio 2015.  It has also been tested with OpenCV 4.3.0 on a Windows 10 machine with Visual Studio 2019.  I use the Community edition of Visual Studio.
 
-Here is a demo video of the older BGHMatcher:
+Click the image to see a YouTube demo video of the older BGHMatcher:
 
-https://www.youtube.com/watch?v=heNQ9mr__L8
+[![BGHMatcher Demo Video](http://img.youtube.com/vi/heNQ9mr__L8/0.jpg)](http://www.youtube.com/watch?v=heNQ9mr__L8)
 
-Here is a demo video of CGHMatcher showing some of the new features:
+Click the image to see a YouTube demo video showing some new features in CGHMatcher:
 
-https://www.youtube.com/watch?v=1j2CDY2_c_k
-
+[![CGHMatcher Demo Video](http://img.youtube.com/vi/1j2CDY2_c_k/0.jpg)](http://www.youtube.com/watch?v=1j2CDY2_c_k)
